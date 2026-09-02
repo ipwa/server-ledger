@@ -1,0 +1,18 @@
+# Runtime data (contains real client/billing info — never commit)
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# This-server-specific deployment files (nginx configs, systemd unit,
+# one-time setup scripts). Kept locally for this deployment but not
+# part of the public template — they hardcode this server's domain,
+# IP, and paths. See README for a generic deployment guide instead.
+nginx-server-ledger.conf
+nginx-server-ledger-bootstrap.conf
+privileged-setup-1.sh
+privileged-setup-2-after-dns.sh
+server-ledger.service
+htpasswd.line

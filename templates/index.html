@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server Ledger</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <p class="eyebrow mono">$ hosting/status --clients</p>
+        <h1 class="title">Server Ledger</h1>
+      </div>
+      <div class="as-of mono">as of {{ today }}</div>
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-tile">
+        <p class="kpi-label">Monthly revenue</p>
+        <p class="kpi-value mono">{{ kpis.revenue_by_currency | money_multi }}</p>
+        <p class="kpi-sub">across {{ kpis.paying_count }} paying client{{ 's' if kpis.paying_count != 1 else '' }}</p>
+      </div>
+      <div class="kpi-tile">
+        <p class="kpi-label">Active</p>
+        <p class="kpi-value mono good">{{ kpis.active_count }}</p>
+        <p class="kpi-sub">paid up, more than 7 days left</p>
+      </div>
+      <div class="kpi-tile">
+        <p class="kpi-label">Expiring &le;7d</p>
+        <p class="kpi-value mono warning">{{ kpis.expiring_count }}</p>
+        <p class="kpi-sub">renew soon</p>
+      </div>
+      <div class="kpi-tile">
+        <p class="kpi-label">Overdue</p>
+        <p class="kpi-value mono critical">{{ kpis.overdue_count }}</p>
+        <p class="kpi-sub">{{ kpis.at_risk_by_currency | money_multi }} at risk</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <input type="text" id="search" class="search-box mono" placeholder="Search name or domain…">
+      <div class="chips" id="chips">
+        <button class="chip active" data-filter="all">All</button>
+        <button class="chip" data-filter="overdue">Overdue</button>
+        <button class="chip" data-filter="expiring">Expiring &le;7d</button>
+        <button class="chip" data-filter="active">Active</button>
+        <button class="chip" data-filter="internal">Internal</button>
+      </div>
+    </div>
+
+    <div class="roster">
+      <div class="roster-head">
+        <div>Client</div>
+        <div>Monthly fee</div>
+        <div>Paid through</div>
+        <div>Days left</div>
+        <div>Status</div>
+      </div>
+
+      {% for c in clients %}
+      <div class="row status-{{ c.status }}"
+           data-name="{{ c.name|lower }}"
+           data-domain="{{ c.domain|lower }}"
+           data-status="{{ c.status }}">
+        <div class="cell cell-client">
+          <div class="name">{{ c.name }}</div>
+          <div class="domain mono">{{ c.domain or '—' }}</div>
+          {% if c.notes %}<div class="notes">{{ c.notes }}</div>{% endif %}
+        </div>
+
+        <div class="cell">
+          <span class="field-label">Monthly fee</span>
+          <span class="fee mono">{{ c.monthly_amount | money(c.currency) if not c.is_personal else '—' }}</span>
+        </div>
+
+        <div class="cell">
+          <span class="field-label">Paid through</span>
+          <span class="paid-through mono">{{ c.paid_through_date if c.paid_through_date else '—' }}</span>
+        </div>
+
+        <div class="cell">
+          <span class="field-label">Days left</span>
+          <div class="meter-wrap">
+            <div class="meter-track">
+              <div class="meter-fill {{ 'critical' if c.status == 'overdue' else 'warning' if c.status == 'expiring' else 'good' if c.status == 'active' else 'internal' }}"
+                   style="width: {{ c.meter.pct }}%"></div>
+            </div>
+            <span class="meter-label {{ 'critical' if c.status == 'overdue' else 'warning' if c.status == 'expiring' else '' }} mono">{{ c.meter.label }}</span>
+          </div>
+        </div>
+
+        <div class="cell">
+          <span class="field-label">Status</span>
+          <span class="pill {{ 'critical' if c.status == 'overdue' else 'warning' if c.status == 'expiring' else 'good' if c.status == 'active' else 'internal' }}">
+            <span class="dot {{ 'critical' if c.status == 'overdue' else 'warning' if c.status == 'expiring' else 'good' if c.status == 'active' else 'internal' }}"></span>
+            {{ c.status | capitalize }}
+          </span>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">No clients yet. <a href="{{ url_for('admin') }}" class="admin-link">Add one in the admin view →</a></div>
+      {% endfor %}
+    </div>
+
+    <p class="footer-note">
+      Status is computed live, not stored: <strong>internal</strong> marks personal/non-billed
+      projects, <strong>overdue</strong> means paid-through has already passed,
+      <strong>expiring</strong> means 7 days or fewer remain, and everything else is
+      <strong>active</strong>. Rows are sorted overdue → expiring → active → internal, soonest
+      paid-through first within each group.
+    </p>
+
+    <a class="admin-link" href="{{ url_for('admin') }}">Manage clients &amp; record payments →</a>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

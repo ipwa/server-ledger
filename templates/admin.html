@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Server Ledger — Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div>
+        <p class="eyebrow mono">$ hosting/status --admin</p>
+        <h1 class="title">Manage clients</h1>
+      </div>
+      <a class="back-link" href="{{ url_for('dashboard') }}">&larr; Back to dashboard</a>
+    </div>
+
+    <div class="admin-section">
+      <h2>Add a client</h2>
+      <form method="post" action="{{ url_for('add_client') }}" class="form-grid">
+        <div class="field">
+          <label>Name</label>
+          <input type="text" name="name" required>
+        </div>
+        <div class="field">
+          <label>Domain</label>
+          <input type="text" name="domain" placeholder="example.com">
+        </div>
+        <div class="field">
+          <label>Monthly fee</label>
+          <input type="number" name="monthly_amount" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Currency</label>
+          <input type="text" name="currency" value="USD" maxlength="3">
+        </div>
+        <div class="field">
+          <label>Paid through</label>
+          <input type="date" name="paid_through_date">
+        </div>
+        <div class="field">
+          <label>Notes</label>
+          <input type="text" name="notes">
+        </div>
+        <div class="field checkbox">
+          <input type="checkbox" name="is_personal" id="is_personal_new" value="true">
+          <label for="is_personal_new">Internal / personal (no fee)</label>
+        </div>
+        <div class="field">
+          <button type="submit">Add client</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="admin-section">
+      <h2>Clients</h2>
+      {% for c in clients %}
+      <div class="admin-row">
+        <div class="admin-row-head">
+          <div>
+            <div class="admin-row-title">{{ c.name }} <span class="pill {{ 'critical' if c.status == 'overdue' else 'warning' if c.status == 'expiring' else 'good' if c.status == 'active' else 'internal' }}"><span class="dot {{ 'critical' if c.status == 'overdue' else 'warning' if c.status == 'expiring' else 'good' if c.status == 'active' else 'internal' }}"></span>{{ c.status | capitalize }}</span></div>
+            <div class="admin-row-sub mono">{{ c.domain or '—' }} &middot; {{ c.monthly_amount | money(c.currency) if not c.is_personal else 'internal' }}{% if not c.is_personal %} &middot; through {{ c.paid_through_date or '—' }}{% endif %}</div>
+          </div>
+          <form method="post" action="{{ url_for('archive_client_form', client_id=c.id) }}" onsubmit="return confirm('Archive {{ c.name }}? This can be restored from the database if needed.');">
+            <button type="submit" class="danger">Archive</button>
+          </form>
+        </div>
+
+        <details>
+          <summary>Edit client</summary>
+          <div class="inline-forms">
+            <form method="post" action="{{ url_for('edit_client_form', client_id=c.id) }}" class="form-grid">
+              <div class="field">
+                <label>Name</label>
+                <input type="text" name="name" value="{{ c.name }}">
+              </div>
+              <div class="field">
+                <label>Domain</label>
+                <input type="text" name="domain" value="{{ c.domain }}">
+              </div>
+              <div class="field">
+                <label>Monthly fee</label>
+                <input type="number" name="monthly_amount" step="0.01" min="0" value="{{ c.monthly_amount if c.monthly_amount is not none else '' }}">
+              </div>
+              <div class="field">
+                <label>Currency</label>
+                <input type="text" name="currency" value="{{ c.currency }}" maxlength="3">
+              </div>
+              <div class="field">
+                <label>Notes</label>
+                <input type="text" name="notes" value="{{ c.notes }}">
+              </div>
+              <div class="field checkbox">
+                <input type="checkbox" name="is_personal" value="true" {{ 'checked' if c.is_personal else '' }}>
+                <label>Internal / personal</label>
+              </div>
+              <div class="field">
+                <button type="submit" class="secondary">Save changes</button>
+              </div>
+            </form>
+          </div>
+        </details>
+
+        <details>
+          <summary>Record payment</summary>
+          <div class="inline-forms">
+            <form method="post" action="{{ url_for('record_payment', client_id=c.id) }}" class="form-grid">
+              <div class="field">
+                <label>Payment amount</label>
+                <input type="number" name="amount" step="0.01" min="0" value="{{ c.monthly_amount if c.monthly_amount is not none else '' }}" required>
+              </div>
+              <div class="field">
+                <label>Paid on <span class="field-hint">(optional)</span></label>
+                <input type="date" name="paid_on_date">
+              </div>
+              <div class="field">
+                <label>Extends from</label>
+                <input type="date" name="extends_from_date">
+              </div>
+              <div class="field">
+                <label>Extends through</label>
+                <input type="date" name="extends_through_date" required>
+              </div>
+              <div class="field">
+                <button type="submit">Record payment</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="payment-history">
+            <h4>Payment history</h4>
+            {% set payments = payments_by_client.get(c.id, []) %}
+            {% if payments %}
+            {% for p in payments %}
+            <div class="history-row">
+              <div class="history-row-head">
+                <div class="mono">
+                  {{ p.paid_on_date }} &middot; {{ p.amount | money(c.currency) }} &middot;
+                  {{ p.extends_from_date or '—' }} &rarr; {{ p.extends_through_date }}
+                </div>
+                <form method="post" action="{{ url_for('delete_payment_form', payment_id=p.id) }}" onsubmit="return confirm('Delete this payment record?');">
+                  <button type="submit" class="danger small">Delete</button>
+                </form>
+              </div>
+              <details>
+                <summary>Edit</summary>
+                <form method="post" action="{{ url_for('edit_payment_form', payment_id=p.id) }}" class="form-grid">
+                  <div class="field">
+                    <label>Payment amount</label>
+                    <input type="number" name="amount" step="0.01" min="0" value="{{ p.amount }}">
+                  </div>
+                  <div class="field">
+                    <label>Paid on</label>
+                    <input type="date" name="paid_on_date" value="{{ p.paid_on_date }}">
+                  </div>
+                  <div class="field">
+                    <label>Extends from</label>
+                    <input type="date" name="extends_from_date" value="{{ p.extends_from_date or '' }}">
+                  </div>
+                  <div class="field">
+                    <label>Extends through</label>
+                    <input type="date" name="extends_through_date" value="{{ p.extends_through_date }}">
+                  </div>
+                  <div class="field">
+                    <button type="submit" class="secondary">Save changes</button>
+                  </div>
+                </form>
+              </details>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="admin-row-sub">No payments recorded yet.</p>
+            {% endif %}
+          </div>
+        </details>
+      </div>
+      {% else %}
+      <p class="admin-row-sub">No clients yet — add one above.</p>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>
